@@ -1,6 +1,7 @@
 # sauron-demo
 sauron demo
 
+Testing Protected Branches
 Does auto-merge still work?
 E73F47E5-A217-46EF-8667-A36452ECD92E
 CE73FDBF-61D7-41D4-9E19-815A45D899C2
