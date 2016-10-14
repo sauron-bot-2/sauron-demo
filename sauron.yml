@@ -1,0 +1,223 @@
+
+# TODO(bbao): Think of better way than to copy paste from yourPeople3.
+initial_state: CodeReviewState
+merged_state: FrodoState
+
+state_machine:
+  CodeReviewState:
+    status_checks:
+      - LGTM:
+          sticky: true
+          keywords:
+            - ':+1:'
+            - 'LGTM'
+            - '#!merge'
+      - merge-label:
+          label_name: 'SAURON-BOT: Merge It!'
+      -
+        - affected-only-buildkite: null
+        - buildkite-fullsuite:
+            remove_from_master_comment: true
+        - buildkite-appsuite:
+            remove_from_master_comment: true
+    hotfix: true
+    skip-ci: true
+    on_success:
+      transition_state: GondorState
+    on_failure:
+      transition_state: CodeReviewState
+
+  # DO NOT DELETE
+  GondorState:
+    parallelism: '40'
+    status_checks:
+      - buildkite-fullsuite: null
+    hotfix: true
+    on_success:
+      transition_state: QueuedState
+    on_failure:
+      transition_state: CodeReviewState
+
+  QueuedState:
+    status_checks:
+      - merged: null
+    on_success:
+      transition_state: FrodoState
+    on_failure:
+      transition_state: CodeReviewState
+
+  FrodoState:
+    status_checks:
+      - frodo: null
+    on_success:
+      transition_state: IntegrationTestState
+    on_failure:
+      transition_state: null
+
+  IntegrationTestState:
+    status_checks:
+      - mordor-glue: null
+      - mordor-canary: null
+    on_success:
+      transition_state: ValidationState
+    on_failure:
+      transition_state: null
+    mordor:
+      mordor-glue:
+        parallelism: 5
+      mordor-canary:
+        parallelism: 10
+        
+  ValidationState:
+    status_checks:
+      - sentry-frontend-beta: null
+      - sentry-backend-beta: null
+      - sumologic-5xx: null
+    on_success:
+      transition_state: ManualGateState_2
+    on_failure:
+      transition_state: null
+
+  # looks stupid but this is actually used for tests.
+  ManualGateState_2:
+    status_checks:
+     - manual-gate: null
+    on_success:
+      transition_state: EndState
+    on_failure:
+      transition_state: null
+      
+  EndState:
+    status_checks: []
+    on_success:
+      transition_state: null
+    on_failure:
+      transition_state: null
+
+hotfix:
+  approved_team_names:
+    - Infrastructure
+    - Hotfix Approvers
+  master-hotfix:
+    branch_name: master
+    label_name: 'HOTFIX: Master Merge'
+    on_success:
+      transition_state: QueuedState
+    on_failure:
+      transition_state: CodeReviewState
+  production-hotfix:
+    branch_name: production
+    label_name: 'HOTFIX: Production Merge'
+    on_success:
+      transition_state: QueuedState
+    on_failure:
+      transition_state: CodeReviewState
+
+
+label_locks:
+  'Hotfix: Master Merge':
+    team_exemptions:
+      - Infrastructure
+      - Hotfix Approvers
+    actions_blacklist:
+      - labeled
+  'HOTFIX: Production Merge':
+    team_exemptions:
+      - Infrastructure
+      - Hotfix Approvers
+    actions_blacklist:
+      - labeled
+  'Awesome Sauron Label':
+    actions_blacklist:
+      - unlabeled
+
+skip-ci:
+  min_char_length: 10
+  transition_state: GondorState
+
+rule_engine:
+  cpp:
+    actions:
+      label:
+        label_name: 'C++ Change'
+    file_types:
+      - .cpp
+    min_files: 1
+  java:
+    actions:
+      pr_comment:
+        comment_body: 'Sauron sees a Java change. Sauron is watching.'
+    comment_filter:
+      - asdf
+    file_types:
+      - .java
+    min_files: 4
+  directory:
+    actions:
+      pr_comment:
+        comment_body: 'there is a change in directory `foobar`'
+    file_names:
+      - foobar
+    excluded_paths:
+      - test_foobar
+    min_files: 4
+  test_module:
+    actions:
+      pr_comment:
+        comment_body: 'testing module names'
+    module_names:
+      - testing_modules
+    min_files: 2
+
+diff_processor:
+  testing_diff_processor:
+    actions:
+      assign:
+        assignees:
+          - sauron-demo-Calvin
+          - sauron-demo-bbao
+      label:
+        label_name: 'TESTING DIFF PROCESSOR'
+    strings_to_check:
+      check_added:
+        - 'testing diff processor'
+        - '175b49fa5a4e47ce6815aecc898afe4bd57bcaf5'
+    excluded_paths:
+      - test_exclude
+  test_diff_push:
+    actions:
+      pr_comment:
+        comment_body: 'DIFF PROCESSING IS SO COOL'
+    strings_to_check:
+      check_added:
+        - 'testing push on diff processor'
+  testing_failed_rule:
+    actions:
+      pr_comment:
+        comment_body: 'DIFF PROCESSING IS SO COOL'
+    strings_to_check:
+      check_deleted:
+        - 'this string does not exist'
+  test_diff_percentage:
+    actions:
+      label:
+        label_name: 'App Suite: Abc'
+    included_paths:
+      - changes/test_diff_processor.txt
+    min_percentage: 70
+  resource_ownership:
+    resource_to_check:
+      django_test:
+        base_class:
+          - TestCase
+      django_model:
+        base_class:
+          - Model
+          - ExtendedModel
+      eta_task:
+        base_class:
+          - Task
+        func_decorator:
+          - task
+          - periodic_task
+
