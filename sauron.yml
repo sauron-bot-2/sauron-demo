@@ -24,6 +24,11 @@ state_machine:
     skip-ci: true
     on_success:
       transition_state: GondorState
+      override_transition_state:
+        QueuedState:
+          -
+            - buildkite-fullsuite
+            - buildkite-appsuite      
     on_failure:
       transition_state: CodeReviewState
 
