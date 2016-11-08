@@ -1,0 +1,39 @@
+end_state: EndState
+state_machine:
+  EndState:
+    status_checks: []
+    on_success:
+      transition_state: EndState
+    on_failure:
+      transition_state: EndState
+  CodeReviewState:
+    status_checks:
+      - LGTM:
+          sticky: true
+          keywords:
+            - ':+1:'
+            - LGTM
+            - '#!merge'
+      - merge-label:
+          label_name: 'SAURON-BOT: Merge It!'
+      - - affected-only-buildkite:
+            remove_from_master_comment: false
+        - buildkite-appsuite:
+            remove_from_master_comment: true
+        - buildkite-fullsuite:
+            remove_from_master_comment: true
+    hotfix: true
+    skip-ci: true
+    on_success:
+      transition_state: QueuedState
+    on_failure:
+      transition_state: CodeReviewState
+  QueuedState:
+    status_checks:
+      - merged: null
+    on_success:
+      transition_state: EndState
+    on_failure:
+      transition_state: CodeReviewState
+initial_state: CodeReviewState
+merged_state: EndState
